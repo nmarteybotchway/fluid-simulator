@@ -36,8 +36,6 @@ public:
     }
 
     inline int IX(int x, int y) {
-        x = std::clamp(x, 0, N -1);
-        y = std::clamp(y, 0, N -1);
         return x + y * N;
     }
 

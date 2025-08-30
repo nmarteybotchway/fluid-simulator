@@ -1,4 +1,3 @@
-#include <iostream>
 #include <SFML/Graphics.hpp>
 #include "Fluid.h"
 
@@ -10,25 +9,18 @@ int main() {
 
     sf::Vector2i prevMousePos = sf::Mouse::getPosition(window);
     bool firstFrame = true;
-    bool isMousePressed = false;
 
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
-
-            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left)
-                isMousePressed = true;
-
-            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left)
-                isMousePressed = false;
         }
 
-        // Get current mouse position every frame
+        // Get current mouse position each frame
         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
 
-        // Compute delta (velocity)
+        // Compute velocity delta
         float amtX = 0.0f;
         float amtY = 0.0f;
         if (!firstFrame) {
@@ -37,19 +29,18 @@ int main() {
         } else {
             firstFrame = false;
         }
-        prevMousePos = mousePos;
 
-        // Apply to fluid if left mouse is pressed
-        if (isMousePressed) {
-            fluid.addDensity(mousePos.x / scale, mousePos.y / scale, 100);
-            fluid.addVelocity(mousePos.x / scale, mousePos.y / scale, amtX, amtY);
-            std::cout << amtX <<amtY <<std::endl;
+        prevMousePos = mousePos; // update for next frame
+
+        // If left mouse pressed, apply to fluid
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
+            int xCell = mousePos.x / scale;
+            int yCell = mousePos.y / scale;
+            fluid.addDensity(xCell, yCell, 100);
+            fluid.addVelocity(xCell, yCell, amtX, amtY);
         }
 
-        // Step the fluid simulation
         fluid.step();
-
-        // Render
         window.clear();
         fluid.renderD(window);
         window.display();
