@@ -2,7 +2,7 @@
 #include "Fluid.h"
 
 int main() {
-    int n = 64;
+    int n = 128;
     int scale = 10;
     Fluid fluid(n, 4, 0.1, 0, 0);
     sf::RenderWindow window(sf::VideoMode(n * scale, n * scale), "Fluid Simulation");
@@ -43,6 +43,7 @@ int main() {
         fluid.step();
         window.clear();
         fluid.renderD(window);
+        fluid.fadeD();
         window.display();
     }
 }
