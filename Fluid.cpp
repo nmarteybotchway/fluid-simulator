@@ -3,9 +3,12 @@
 //
 
 #include "Fluid.h"
+#include <omp.h>
 
-Fluid::Fluid(int size, int iters, float dt, float diffusion, float viscosity) :
-    N{size}, iters{iters}, dt{dt}, diff{diffusion}, visc{viscosity} {
+#include <cmath>
+
+Fluid::Fluid(int size, int iters, float dt, float diffusion, float viscosity, int scale) :
+    N{size}, iters{iters}, dt{dt}, diff{diffusion}, visc{viscosity}, scale{scale}{
     s.resize(N*N, 0.0f);
     density.resize(N*N, 0.0f);
 
@@ -21,7 +24,19 @@ inline int Fluid::IX(int x, int y) const {
 }
 
 void Fluid::addDensity(int x, int y, float amount) {
-    density[IX(x, y)] += amount;
+    int radius = 1;  // adjust this for smoother / wider strokes
+
+    for (int j = -radius; j <= radius; j++) {
+        for (int i = -radius; i <= radius; i++) {
+            int xi = x + i;
+            int yj = y + j;
+            if (xi >= 0 && xi < N && yj >= 0 && yj < N) {
+                float dist2 = i*i + j*j;
+                float weight = std::exp(-dist2 / (2.0f * radius * radius));
+                density[IX(xi, yj)] += amount * weight;
+            }
+        }
+    }
 }
 
 void Fluid::addVelocity(int x, int y, float amountX, float amountY) {
@@ -47,21 +62,31 @@ void Fluid::set_bnd(int b, std::vector<float>& x) {
 
 void Fluid::lin_solve(int b, std::vector<float>& x, const std::vector<float>& x0, float a, float c) {
     float cRecip = 1.0f / c;
+    std::vector<float> xNew(x.size(), 0.0f);
+
     for (int k = 0; k < iters; k++) {
+#pragma omp parallel for collapse(2)
         for (int j = 1; j < N - 1; j++) {
             for (int i = 1; i < N - 1; i++) {
-                x[IX(i, j)] =
+                xNew[IX(i, j)] =
                     (x0[IX(i, j)]
                     + a*(x[IX(i+1, j)] + x[IX(i-1, j)]
                          + x[IX(i, j+1)] + x[IX(i, j-1)])) * cRecip;
             }
         }
+
+        // swap roles: new becomes current
+        std::swap(x, xNew);
+
+        // apply boundary conditions
         set_bnd(b, x);
     }
 }
 
 void Fluid::project(std::vector<float>& velocX, std::vector<float>& velocY,
-             std::vector<float>& p, std::vector<float>& div) {
+                    std::vector<float>& p, std::vector<float>& div) {
+    // First loop: compute divergence & reset p
+#pragma omp parallel for collapse(2)
     for (int j = 1; j < N - 1; j++) {
         for (int i = 1; i < N - 1; i++) {
             div[IX(i, j)] = -0.5f*(
@@ -71,40 +96,63 @@ void Fluid::project(std::vector<float>& velocX, std::vector<float>& velocY,
             p[IX(i, j)] = 0;
         }
     }
+
     set_bnd(0, div);
     set_bnd(0, p);
     lin_solve(0, p, div, 1, 6);
 
+    // Second loop: subtract gradient of pressure
+#pragma omp parallel for collapse(2)
     for (int j = 1; j < N - 1; j++) {
         for (int i = 1; i < N - 1; i++) {
             velocX[IX(i, j)] -= 0.5f * (p[IX(i+1, j)] - p[IX(i-1, j)]) * N;
             velocY[IX(i, j)] -= 0.5f * (p[IX(i, j+1)] - p[IX(i, j-1)]) * N;
         }
     }
+
     set_bnd(1, velocX);
     set_bnd(2, velocY);
 }
 
+
 void Fluid::step() {
-    diffuse(1, Vx0, Vx, visc, dt);
-    diffuse(2, Vy0, Vy, visc, dt);
+    // Diffuse velocities
+#pragma omp parallel sections
+    {
+#pragma omp section
+        diffuse(1, Vx0, Vx, visc, dt);
+
+#pragma omp section
+        diffuse(2, Vy0, Vy, visc, dt);
+    }
 
     project(Vx0, Vy0, Vx, Vy);
 
-    advect(1, Vx, Vx0, Vx0, Vy0, dt);
-    advect(2, Vy, Vy0, Vx0, Vy0, dt);
+    // Advect velocities
+#pragma omp parallel sections
+    {
+#pragma omp section
+        advect(1, Vx, Vx0, Vx0, Vy0, dt);
+
+#pragma omp section
+        advect(2, Vy, Vy0, Vx0, Vy0, dt);
+    }
 
     project(Vx, Vy, Vx0, Vy0);
 
+    // Diffuse and advect density
     diffuse(0, s, density, diff, dt);
     advect(0, density, s, Vx, Vy, dt);
 }
 
 void Fluid::advect(int b, std::vector<float>& d, const std::vector<float>& d0,
-            const std::vector<float>& velocX, const std::vector<float>& velocY, float dt) {
+                   const std::vector<float>& velocX, const std::vector<float>& velocY, float dt) {
     float Nfloat = N;
     float dtx = dt * (N - 2);
     float dty = dt * (N - 2);
+
+    // Parallelize the 2D grid loop
+#pragma omp parallel for collapse(2)
     for (int j = 1; j < N - 1; j++) {
         for (int i = 1; i < N - 1; i++) {
             float x = i - dtx * velocX[IX(i,j)];
@@ -115,9 +163,9 @@ void Fluid::advect(int b, std::vector<float>& d, const std::vector<float>& d0,
             if (y < 0.5f) y = 0.5f;
             if (y > Nfloat - 1.5f) y = Nfloat - 1.5f;
 
-            int i0 = static_cast<int>(floor(x));
+            int i0 = static_cast<int>(std::floor(x));
             int i1 = i0 + 1;
-            int j0 = static_cast<int>(floor(y));
+            int j0 = static_cast<int>(std::floor(y));
             int j1 = j0 + 1;
 
             float s1 = x - i0;
@@ -130,6 +178,7 @@ void Fluid::advect(int b, std::vector<float>& d, const std::vector<float>& d0,
                 s1*(t0*d0[IX(i1,j0)] + t1*d0[IX(i1,j1)]);
         }
     }
+
     set_bnd(b, d);
 }
 
@@ -140,21 +189,41 @@ void Fluid::diffuse(int b, std::vector<float>& x, const std::vector<float>& x0,
 }
 
 void Fluid::renderD(sf::RenderWindow& window) {
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            float d = density[IX(i,j)];
-            sf::Uint8 c = static_cast<sf::Uint8>(std::clamp(d, 0.0f, 255.0f));
-            sf::RectangleShape cell(sf::Vector2f(10,10));
-            cell.setPosition(i*10, j*10);
-            cell.setFillColor(sf::Color(c,c,c));
-            window.draw(cell);
+    static sf::Texture densityTex;
+    static bool initialized = false;
+
+    if (!initialized) {
+        densityTex.create(N, N);
+        densityTex.setSmooth(true); // smooth scaling
+        initialized = true;
+    }
+
+    // Update texture pixels from density
+    std::vector<sf::Uint8> pixels(N * N * 4); // RGBA
+    for (int j = 0; j < N; j++) {
+        for (int i = 0; i < N; i++) {
+            float d = density[IX(i, j)] / 255.0f;
+            sf::Uint8 c = static_cast<sf::Uint8>(std::clamp(d * 255.0f, 0.f, 255.f));
+            int idx = 4 * (j * N + i);
+            pixels[idx + 0] = c; // R
+            pixels[idx + 1] = c; // G
+            pixels[idx + 2] = c; // B
+            pixels[idx + 3] = 255; // A
         }
     }
+
+    densityTex.update(pixels.data());
+
+    sf::Sprite sprite(densityTex);
+    sprite.setScale(scale, scale); // use scale member
+
+    window.draw(sprite);
 }
 
 void Fluid::fadeD() {
+#pragma omp parallel for
     for (int i = 0; i < this->density.size(); i++) {
         float d = density[i];
-        density[i] = std::clamp(d-0.05f, 0.f, 255.f);
+        density[i] = std::clamp(d - 0.05f, 0.f, 255.f);
     }
 }

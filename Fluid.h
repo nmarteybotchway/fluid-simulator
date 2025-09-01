@@ -12,7 +12,7 @@ class Fluid {
     float dt;
     float diff;
     float visc;
-
+    int scale;
     std::vector<float> s;
     std::vector<float> density;
 
@@ -23,8 +23,8 @@ class Fluid {
     std::vector<float> Vy0;
 
 public:
-    Fluid(int size, int iters, float dt, float diffusion, float viscosity);
-
+    Fluid(int size, int iters, float dt, float diffusion, float viscosity, int scale);
+    int getScale() { return scale; }
     inline int IX(int x, int y) const;
 
     void addDensity(int x, int y, float amount);

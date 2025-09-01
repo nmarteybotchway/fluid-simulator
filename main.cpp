@@ -1,14 +1,18 @@
 #include <SFML/Graphics.hpp>
 #include "Fluid.h"
+#include <chrono>
+#include <iostream>
 
 int main() {
-    int n = 128;
-    int scale = 10;
-    Fluid fluid(n, 4, 0.1, 0, 0);
-    sf::RenderWindow window(sf::VideoMode(n * scale, n * scale), "Fluid Simulation");
+    int n = 256;
+    Fluid fluid(n, 4, 0.1, 0, 0, 10);
+    sf::RenderWindow window(sf::VideoMode(n * fluid.getScale(), n * fluid.getScale()), "Fluid Simulation");
 
     sf::Vector2i prevMousePos = sf::Mouse::getPosition(window);
     bool firstFrame = true;
+
+    double totalTime = 0.0;
+    int stepCount = 0;
 
     while (window.isOpen()) {
         sf::Event event;
@@ -17,10 +21,8 @@ int main() {
                 window.close();
         }
 
-        // Get current mouse position each frame
         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
 
-        // Compute velocity delta
         float amtX = 0.0f;
         float amtY = 0.0f;
         if (!firstFrame) {
@@ -29,18 +31,34 @@ int main() {
         } else {
             firstFrame = false;
         }
+        prevMousePos = mousePos;
 
-        prevMousePos = mousePos; // update for next frame
-
-        // If left mouse pressed, apply to fluid
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-            int xCell = mousePos.x / scale;
-            int yCell = mousePos.y / scale;
-            fluid.addDensity(xCell, yCell, 100);
-            fluid.addVelocity(xCell, yCell, amtX, amtY);
+            int xCell = mousePos.x / fluid.getScale();
+            int yCell = mousePos.y / fluid.getScale();
+
+            if (xCell >= 0 && xCell < n && yCell >= 0 && yCell < n) {
+                fluid.addDensity(xCell, yCell, 100);
+                fluid.addVelocity(xCell, yCell, amtX / fluid.getScale(), amtY / fluid.getScale());
+            }
         }
 
+
+        // -------------------- timing --------------------
+        auto start = std::chrono::high_resolution_clock::now();
         fluid.step();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+
+        totalTime += elapsed.count();
+        stepCount++;
+
+        if (stepCount % 100 == 0) {  // print every 100 steps
+            std::cout << "Average step time over " << stepCount
+                      << " steps: " << totalTime / stepCount << " seconds" << std::endl;
+        }
+        // ------------------------------------------------
+
         window.clear();
         fluid.renderD(window);
         fluid.fadeD();
