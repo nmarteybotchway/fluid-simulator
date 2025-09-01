@@ -24,9 +24,11 @@ class Fluid {
 
 public:
     Fluid(int size, int iters, float dt, float diffusion, float viscosity, int scale);
-    int getScale() { return scale; }
-    inline int IX(int x, int y) const;
-
+    [[nodiscard]] int getScale() const { return scale; }
+    [[nodiscard]] int getGridSize() const { return gridSize; }
+    [[nodiscard]] inline int IX(int x, int y) const;
+    [[nodiscard]] int getWindowWidth() const { return gridSize * scale; }
+    [[nodiscard]] int getWindowHeight() const { return gridSize * scale; }
     void addDensity(int x, int y, float amount);
     void addVelocity(int x, int y, float amountX, float amountY);
 
