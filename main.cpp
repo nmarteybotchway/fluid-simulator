@@ -5,7 +5,7 @@
 
 int main() {
     int n = 256;
-    Fluid fluid(n, 4, 0.1, 0, 0, 10);
+    Fluid fluid(n, 4, 0.1, 0, 0, 3);
     sf::RenderWindow window(sf::VideoMode(n * fluid.getScale(), n * fluid.getScale()), "Fluid Simulation");
 
     sf::Vector2i prevMousePos = sf::Mouse::getPosition(window);
@@ -42,22 +42,6 @@ int main() {
                 fluid.addVelocity(xCell, yCell, amtX / fluid.getScale(), amtY / fluid.getScale());
             }
         }
-
-
-        // -------------------- timing --------------------
-        auto start = std::chrono::high_resolution_clock::now();
-        fluid.step();
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-
-        totalTime += elapsed.count();
-        stepCount++;
-
-        if (stepCount % 100 == 0) {  // print every 100 steps
-            std::cout << "Average step time over " << stepCount
-                      << " steps: " << totalTime / stepCount << " seconds" << std::endl;
-        }
-        // ------------------------------------------------
 
         window.clear();
         fluid.renderD(window);
