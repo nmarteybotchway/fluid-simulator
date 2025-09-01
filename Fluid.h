@@ -30,18 +30,18 @@ public:
     void addDensity(int x, int y, float amount);
     void addVelocity(int x, int y, float amountX, float amountY);
 
-    void set_bnd(int b, std::vector<float>& x);
-    void lin_solve(int b, std::vector<float>& x, const std::vector<float>& x0, float a, float c);
-    void project(std::vector<float>& velocX, std::vector<float>& velocY,
-                 std::vector<float>& p, std::vector<float>& div);
+    void set_bnd(int b, std::vector<float>& x) const;
+    void lin_solve(int b, std::vector<float>& x, const std::vector<float>& x0, float a, float c) const;
+    void project(std::vector<float>& velocityX, std::vector<float>& velocityY,
+                 std::vector<float>& p, std::vector<float>& div) const;
     void step();
 
     void advect(int b, std::vector<float>& d, const std::vector<float>& d0,
-                const std::vector<float>& velocX, const std::vector<float>& velocY, float dt);
+                const std::vector<float>& velocityX, const std::vector<float>& velocityY, float dt) const;
 
     void diffuse(int b, std::vector<float>& x, const std::vector<float>& x0,
-                 float diff, float dt);
-    void renderD(sf::RenderWindow& window);
+                 float diff, float dt) const;
+    void renderD(sf::RenderWindow& window) const;
     void fadeD();
 };
 
