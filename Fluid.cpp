@@ -43,7 +43,7 @@ void Fluid::addVelocity(const int x, const int y, const float amountX, const flo
     velocityY[IX(x, y)] += amountY;
 }
 
-void Fluid::set_bnd(const int b, std::vector<float>& x) const {
+void Fluid::applyBoundaryConditions(const int b, std::vector<float>& x) const {
     for (int i = 1; i < gridSize - 1; i++) {
         x[IX(i, 0)] = b == 2 ? -x[IX(i, 1)] : x[IX(i, 1)];
         x[IX(i, gridSize - 1)] = b == 2 ? -x[IX(i, gridSize - 2)] : x[IX(i, gridSize - 2)];
@@ -59,7 +59,7 @@ void Fluid::set_bnd(const int b, std::vector<float>& x) const {
     x[IX(gridSize-1, gridSize-1)] = 0.5f * (x[IX(gridSize-2, gridSize-1)] + x[IX(gridSize-1, gridSize-2)]);
 }
 
-void Fluid::lin_solve(const int b, std::vector<float>& x, const std::vector<float>& x0, const float a, const float c)
+void Fluid::linearSolve(const int b, std::vector<float>& x, const std::vector<float>& x0, const float a, const float c)
 const {
     const float cRecip = 1.0f / c;
     std::vector<float> xNew(x.size(), 0.0f);
@@ -79,11 +79,11 @@ const {
         std::swap(x, xNew);
 
         // apply boundary conditions
-        set_bnd(b, x);
+        applyBoundaryConditions(b, x);
     }
 }
 
-void Fluid::project(std::vector<float>& velocityX, std::vector<float>& velocityY,
+void Fluid::projectVelocity(std::vector<float>& velocityX, std::vector<float>& velocityY,
                     std::vector<float>& p, std::vector<float>& div) const {
     // First loop: compute divergence & reset p
 #pragma omp parallel for collapse(2)
@@ -97,9 +97,9 @@ void Fluid::project(std::vector<float>& velocityX, std::vector<float>& velocityY
         }
     }
 
-    set_bnd(0, div);
-    set_bnd(0, p);
-    lin_solve(0, p, div, 1, 6);
+    applyBoundaryConditions(0, div);
+    applyBoundaryConditions(0, p);
+    linearSolve(0, p, div, 1, 6);
 
     // Second loop: subtract gradient of pressure
 #pragma omp parallel for collapse(2)
@@ -110,42 +110,42 @@ void Fluid::project(std::vector<float>& velocityX, std::vector<float>& velocityY
         }
     }
 
-    set_bnd(1, velocityX);
-    set_bnd(2, velocityY);
+    applyBoundaryConditions(1, velocityX);
+    applyBoundaryConditions(2, velocityY);
 }
 
 
-void Fluid::step() {
+void Fluid::advanceSimulation() {
     // Diffuse velocities
 #pragma omp parallel sections
     {
 #pragma omp section
-        diffuse(1, velocityXPrev, velocityX, viscosity, timeStep);
+        diffuseQuantity(1, velocityXPrev, velocityX, viscosity, timeStep);
 
 #pragma omp section
-        diffuse(2, velocityYPrev, velocityY, viscosity, timeStep);
+        diffuseQuantity(2, velocityYPrev, velocityY, viscosity, timeStep);
     }
 
-    project(velocityXPrev, velocityYPrev, velocityX, velocityY);
+    projectVelocity(velocityXPrev, velocityYPrev, velocityX, velocityY);
 
     // Advect velocities
 #pragma omp parallel sections
     {
 #pragma omp section
-        advect(1, velocityX, velocityXPrev, velocityXPrev, velocityYPrev, timeStep);
+        advectQuantity(1, velocityX, velocityXPrev, velocityXPrev, velocityYPrev, timeStep);
 
 #pragma omp section
-        advect(2, velocityY, velocityYPrev, velocityXPrev, velocityYPrev, timeStep);
+        advectQuantity(2, velocityY, velocityYPrev, velocityXPrev, velocityYPrev, timeStep);
     }
 
-    project(velocityX, velocityY, velocityXPrev, velocityYPrev);
+    projectVelocity(velocityX, velocityY, velocityXPrev, velocityYPrev);
 
     // Diffuse and advect density
-    diffuse(0, prevDensity, density, diffusionRate, timeStep);
-    advect(0, density, prevDensity, velocityX, velocityY, timeStep);
+    diffuseQuantity(0, prevDensity, density, diffusionRate, timeStep);
+    advectQuantity(0, density, prevDensity, velocityX, velocityY, timeStep);
 }
 
-void Fluid::advect(int b, std::vector<float>& d, const std::vector<float>& d0,
+void Fluid::advectQuantity(int b, std::vector<float>& d, const std::vector<float>& d0,
                    const std::vector<float>& velocityX, const std::vector<float>& velocityY, float timeStep) const {
     float nfloat = gridSize;
     float dtx = timeStep * (gridSize - 2);
@@ -179,16 +179,16 @@ void Fluid::advect(int b, std::vector<float>& d, const std::vector<float>& d0,
         }
     }
 
-    set_bnd(b, d);
+    applyBoundaryConditions(b, d);
 }
 
-void Fluid::diffuse(int b, std::vector<float>& x, const std::vector<float>& x0,
+void Fluid::diffuseQuantity(int b, std::vector<float>& x, const std::vector<float>& x0,
              float diffusionRate, float timeStep) const {
     float a = timeStep * diffusionRate * (gridSize - 2) * (gridSize - 2);
-    lin_solve(b, x, x0, a, 1 + 6*a);
+    linearSolve(b, x, x0, a, 1 + 6*a);
 }
 
-void Fluid::renderD(sf::RenderWindow& window) const {
+void Fluid::renderDensity(sf::RenderWindow& window) const {
     static sf::Texture densityTex;
     static bool initialized = false;
 
@@ -220,7 +220,7 @@ void Fluid::renderD(sf::RenderWindow& window) const {
     window.draw(sprite);
 }
 
-void Fluid::fadeD() {
+void Fluid::decayDensity() {
 #pragma omp parallel for
     for (int i = 0; i < this->density.size(); i++) {
         const float d = density[i];

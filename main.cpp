@@ -38,10 +38,10 @@ int main() {
             }
         }
 
-        fluid.step();
+        fluid.advanceSimulation();
         window.clear();
-        fluid.renderD(window);
-        fluid.fadeD();
+        fluid.renderDensity(window);
+        fluid.decayDensity();
         window.display();
     }
 }

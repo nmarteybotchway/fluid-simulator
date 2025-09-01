@@ -30,19 +30,19 @@ public:
     void addDensity(int x, int y, float amount);
     void addVelocity(int x, int y, float amountX, float amountY);
 
-    void set_bnd(int b, std::vector<float>& x) const;
-    void lin_solve(int b, std::vector<float>& x, const std::vector<float>& x0, float a, float c) const;
-    void project(std::vector<float>& velocityX, std::vector<float>& velocityY,
+    void applyBoundaryConditions(int b, std::vector<float>& x) const;
+    void linearSolve(int b, std::vector<float>& x, const std::vector<float>& x0, float a, float c) const;
+    void projectVelocity(std::vector<float>& velocityX, std::vector<float>& velocityY,
                  std::vector<float>& p, std::vector<float>& div) const;
-    void step();
+    void advanceSimulation();
 
-    void advect(int b, std::vector<float>& d, const std::vector<float>& d0,
+    void advectQuantity(int b, std::vector<float>& d, const std::vector<float>& d0,
                 const std::vector<float>& velocityX, const std::vector<float>& velocityY, float dt) const;
 
-    void diffuse(int b, std::vector<float>& x, const std::vector<float>& x0,
+    void diffuseQuantity(int b, std::vector<float>& x, const std::vector<float>& x0,
                  float diff, float dt) const;
-    void renderD(sf::RenderWindow& window) const;
-    void fadeD();
+    void renderDensity(sf::RenderWindow& window) const;
+    void decayDensity();
 };
 
 #endif //FLUID_SIMULATION_FLUID_H
