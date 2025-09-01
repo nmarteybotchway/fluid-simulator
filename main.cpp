@@ -4,7 +4,8 @@
 int main() {
     int n = 256;
     Fluid fluid(n, 4, 0.1, 0, 0, 3);
-    sf::RenderWindow window(sf::VideoMode(n * fluid.getScale(), n * fluid.getScale()), "Fluid Simulation");
+    sf::RenderWindow window(sf::VideoMode(n * fluid.getScale(), n * fluid.getScale()),
+        "Fluid Simulation", sf::Style::Titlebar | sf::Style::Close );
 
     sf::Vector2i prevMousePos = sf::Mouse::getPosition(window);
     bool firstFrame = true;

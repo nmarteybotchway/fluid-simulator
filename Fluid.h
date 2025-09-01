@@ -7,20 +7,20 @@
 #include <algorithm>
 
 class Fluid {
-    int N;
-    int iters;
-    float dt;
-    float diff;
-    float visc;
+    int gridSize;
+    int solverIterations;
+    float timeStep;
+    float diffusionRate;
+    float viscosity;
     int scale;
-    std::vector<float> s;
+    std::vector<float> prevDensity;
     std::vector<float> density;
 
-    std::vector<float> Vx;
-    std::vector<float> Vy;
+    std::vector<float> velocityX;
+    std::vector<float> velocityY;
 
-    std::vector<float> Vx0;
-    std::vector<float> Vy0;
+    std::vector<float> velocityXPrev;
+    std::vector<float> velocityYPrev;
 
 public:
     Fluid(int size, int iters, float dt, float diffusion, float viscosity, int scale);
