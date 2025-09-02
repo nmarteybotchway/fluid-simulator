@@ -14,18 +14,20 @@ Fluid::Fluid(const int gridSize, const int solverIterations, const float timeSte
     velocityX{gridSize},
     velocityY{gridSize},
     velocityXPrev{gridSize},
-    velocityYPrev{gridSize} {}
+    velocityYPrev{gridSize},
+    linearSolveBuffer{gridSize} // initialize buffer for linearSolve
+{}
 
 /**
  * Add density to a cell and its neighbors with Gaussian weighting for smooth strokes.
  */
 void Fluid::addDensity(const int x, const int y, const float amount) {
-    constexpr int radius = 1;  // local neighborhood for smooth addition
+    constexpr int radius = 1;
 
     for (int j = -radius; j <= radius; j++) {
         for (int i = -radius; i <= radius; i++) {
             const int xi = x + i;
-            int yj = y + j;
+            const int yj = y + j;
             if (xi >= 0 && xi < gridSize && yj >= 0 && yj < gridSize) {
                 const float dist2 = i*i + j*j;
                 const float weight = std::exp(-dist2 / (2.0f * radius * radius));
@@ -48,7 +50,6 @@ void Fluid::addVelocity(const int x, const int y, const float amountX, const flo
  * b=0: density, b=1: x-velocity, b=2: y-velocity
  */
 void Fluid::applyBoundaryConditions(const int b, Grid& x) const {
-    // Edges: mirror or invert velocities
     for (int i = 1; i < gridSize - 1; i++) {
         x(i, 0) = b == 2 ? -x(i, 1) : x(i, 1);
         x(i, gridSize - 1) = b == 2 ? -x(i, gridSize - 2) : x(i, gridSize - 2);
@@ -58,7 +59,6 @@ void Fluid::applyBoundaryConditions(const int b, Grid& x) const {
         x(gridSize - 1, j) = b == 1 ? -x(gridSize - 2, j) : x(gridSize - 2, j);
     }
 
-    // Corners: average neighbors
     x(0, 0) = 0.5f * (x(1, 0) + x(0, 1));
     x(0, gridSize-1) = 0.5f * (x(1, gridSize-1) + x(0, gridSize-2));
     x(gridSize-1, 0) = 0.5f * (x(gridSize-2, 0) + x(gridSize-1, 1));
@@ -67,19 +67,19 @@ void Fluid::applyBoundaryConditions(const int b, Grid& x) const {
 
 /**
  * Solve linear system for diffusion or projection using Gauss-Seidel.
- * Reuses a static buffer to avoid per-iteration allocation.
+ * Reuses a member buffer to avoid per-iteration allocation.
  */
 void Fluid::linearSolve(const int b, Grid& x, const Grid& x0, const float a, const float c) const {
     const float cRecip = 1.0f / c;
-    static Grid xNew;                // reused buffer
-    if (xNew.size != x.size)          // resize if grid changed
-        xNew = Grid(x.size, 0.0f);
+
+    if (linearSolveBuffer.size != x.size)
+        linearSolveBuffer = Grid(x.size, 0.0f);
+    Grid& xNew = linearSolveBuffer;
 
     for (int k = 0; k < solverIterations; k++) {
 #pragma omp parallel for collapse(2)
         for (int j = 1; j < gridSize - 1; j++) {
             for (int i = 1; i < gridSize - 1; i++) {
-                // weighted average of neighbors + source
                 xNew(i, j) =
                     (x0(i, j)
                     + a*(x(i+1, j) + x(i-1, j)
@@ -87,8 +87,8 @@ void Fluid::linearSolve(const int b, Grid& x, const Grid& x0, const float a, con
             }
         }
 
-        std::swap(x, xNew);                 // swap current and new grids
-        applyBoundaryConditions(b, x);      // enforce BCs after iteration
+        std::swap(x, xNew);
+        applyBoundaryConditions(b, x);
     }
 }
 
@@ -97,7 +97,6 @@ void Fluid::linearSolve(const int b, Grid& x, const Grid& x0, const float a, con
  */
 void Fluid::projectVelocity(Grid& velocityX, Grid& velocityY,
                     Grid& p, Grid& div) const {
-    // Compute divergence and reset pressure
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
@@ -111,9 +110,8 @@ void Fluid::projectVelocity(Grid& velocityX, Grid& velocityY,
 
     applyBoundaryConditions(0, div);
     applyBoundaryConditions(0, p);
-    linearSolve(0, p, div, 1, 6); // solve Poisson for pressure
+    linearSolve(0, p, div, 1, 6);
 
-    // Subtract pressure gradient to enforce incompressibility
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
@@ -130,7 +128,6 @@ void Fluid::projectVelocity(Grid& velocityX, Grid& velocityY,
  * Advance simulation: diffuse, advect, and project velocities and density.
  */
 void Fluid::advanceSimulation() {
-    // Diffuse velocities in parallel
 #pragma omp parallel sections
     {
 #pragma omp section
@@ -142,7 +139,6 @@ void Fluid::advanceSimulation() {
 
     projectVelocity(velocityXPrev, velocityYPrev, velocityX, velocityY);
 
-    // Advect velocities
 #pragma omp parallel sections
     {
 #pragma omp section
@@ -154,7 +150,6 @@ void Fluid::advanceSimulation() {
 
     projectVelocity(velocityX, velocityY, velocityXPrev, velocityYPrev);
 
-    // Diffuse and advect density
     diffuseQuantity(0, prevDensity, density, diffusionRate, timeStep);
     advectQuantity(0, density, prevDensity, velocityX, velocityY, timeStep);
 }
@@ -164,21 +159,18 @@ void Fluid::advanceSimulation() {
  */
 void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
                    const Grid& velocityX, const Grid& velocityY, float timeStep) const {
-    const auto nFloat = gridSize;
-    float dtx = timeStep * (gridSize - 2);
-    float dty = timeStep * (gridSize - 2);
+    const float backtraceScale = timeStep * (gridSize - 2);
 
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
-            float x = i - dtx * velocityX(i,j); // trace backward
-            float y = j - dty * velocityY(i,j);
+            float x = i - backtraceScale * velocityX(i,j);
+            float y = j - backtraceScale * velocityY(i,j);
 
-            // clamp to grid boundaries
             if (x < 0.5f) x = 0.5f;
-            if (x > nFloat - 1.5f) x = nFloat - 1.5f;
+            if (x > gridSize - 1.5f) x = gridSize - 1.5f;
             if (y < 0.5f) y = 0.5f;
-            if (y > nFloat - 1.5f) y = nFloat - 1.5f;
+            if (y > gridSize - 1.5f) y = gridSize - 1.5f;
 
             const int i0 = static_cast<int>(std::floor(x));
             const int i1 = i0 + 1;
@@ -190,7 +182,6 @@ void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
             const float t1 = y - j0;
             const float t0 = 1.0f - t1;
 
-            // bilinear interpolation
             d(i,j) =
                 s0*(t0*d0(i0,j0) + t1*d0(i0,j1)) +
                 s1*(t0*d0(i1,j0) + t1*d0(i1,j1));
@@ -201,7 +192,7 @@ void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
 }
 
 /**
- * Diffuse a quantity by solving the linear system
+ * Diffuse a quantity by solving the linear system.
  */
 void Fluid::diffuseQuantity(int b, Grid& x, const Grid& x0,
              const float diffusionRate, const float timeStep) const {

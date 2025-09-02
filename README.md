@@ -17,7 +17,7 @@ Add density and velocity interactively with your mouse to create swirling fluid 
 
 ## Demo
 
-![Fluid Simulation Screenshot](screenshot.png)  <!-- Replace with actual screenshot if available -->
+![Fluid Simulation Screenshot](assets/demo.gif)  <!-- Replace with actual screenshot if available -->
 
 ---
 
