@@ -33,7 +33,7 @@ Add density and velocity interactively with your mouse to create swirling fluid 
 ### Building
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/nmarteybotchway/fluid-simulator.git
 cd fluid_simulation
 mkdir build && cd build
 cmake ..
@@ -48,26 +48,3 @@ cmake --build .
 
 - Left mouse click + drag: add density and velocity.
 - Close window to exit
-
-## Project Structure
-
-### `Fluid.h` / `Fluid.cpp`
-
-Main fluid simulation class implementing:
-
-- `addDensity` / `addVelocity` – Add density or velocity to the fluid at a given cell.
-- `advanceSimulation` – Performs a full simulation step: advection, diffusion, and projection.
-- `renderDensity` – Updates an SFML texture for visualization.
-- Optional: `decayDensity` – Gradually reduces density over time (can be disabled).
-
-### `Grid.h`
-
-Simple 2D float grid wrapper with bounds-checked access, used for density and velocity fields.
-
-### `main.cpp`
-
-Entry point of the application. Handles:
-
-- SFML window creation and rendering loop.
-- Mouse input to inject density/velocity.
-- Calls `advanceSimulation` and `renderDensity` every frame.
