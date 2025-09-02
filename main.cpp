@@ -3,8 +3,8 @@
 
 // Helper function to apply mouse input to the fluid
 void applyMouseInteraction(Fluid& fluid, const sf::Vector2i& mousePos, const sf::Vector2i& delta) {
-    if (sf::Vector2i cellPos(mousePos.x / fluid.getScale(), mousePos.y / fluid.getScale()); cellPos.x >= 0 && cellPos.x < fluid.getGridSize() &&
-                                                                                            cellPos.y >= 0 && cellPos.y < fluid.getGridSize()) {
+    if (sf::Vector2i cellPos(mousePos.x / fluid.getScale(), mousePos.y / fluid.getScale());
+        cellPos.x >= 0 && cellPos.x < fluid.getGridSize() && cellPos.y >= 0 && cellPos.y < fluid.getGridSize()) {
         fluid.addDensity(cellPos.x, cellPos.y, 100.0f);
         fluid.addVelocity(cellPos.x, cellPos.y,
                           static_cast<float>(delta.x) / fluid.getScale(),
@@ -45,7 +45,7 @@ int main() {
         // Render
         window.clear();
         fluid.renderDensity(window);
-        fluid.decayDensity();
+        // fluid.decayDensity();
         window.display();
     }
 }

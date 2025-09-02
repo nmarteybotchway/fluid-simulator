@@ -10,7 +10,8 @@ find_package(SFML 2.5 REQUIRED graphics window system)
 # Add your source files
 add_executable(fluid_simulation main.cpp
         Fluid.cpp
-        Fluid.h)
+        Fluid.h
+        Grid.h)
 
 # Link SFML libraries to your project
 target_link_libraries(fluid_simulation sfml-graphics sfml-window sfml-system)

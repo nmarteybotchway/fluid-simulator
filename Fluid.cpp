@@ -1,26 +1,20 @@
-//
-// Created by neil on 8/30/25.
-//
-
 #include "Fluid.h"
-
 #include <cmath>
 
-Fluid::Fluid(const int gridSize, const int solverIterations, const float timeStep, const float diffusionRate, const float viscosity, const int scale) :
-    gridSize{gridSize}, solverIterations{solverIterations}, timeStep{timeStep}, diffusionRate{diffusionRate}, viscosity{viscosity}, scale{scale}{
-    prevDensity.resize(gridSize*gridSize, 0.0f);
-    density.resize(gridSize*gridSize, 0.0f);
-
-    velocityX.resize(gridSize*gridSize, 0.0f);
-    velocityY.resize(gridSize*gridSize, 0.0f);
-
-    velocityXPrev.resize(gridSize*gridSize, 0.0f);
-    velocityYPrev.resize(gridSize*gridSize, 0.0f);
-}
-
-inline int Fluid::IX(const int x, const int y) const {
-    return x + y * gridSize;
-}
+Fluid::Fluid(const int gridSize, const int solverIterations, const float timeStep, const float diffusionRate,
+    const float viscosity, const int scale) :
+    gridSize{gridSize},
+    solverIterations{solverIterations},
+    timeStep{timeStep},
+    diffusionRate{diffusionRate},
+    viscosity{viscosity},
+    scale{scale},
+    prevDensity{gridSize},
+    density{gridSize},
+    velocityX{gridSize},
+    velocityY{gridSize},
+    velocityXPrev{gridSize},
+    velocityYPrev{gridSize} {}
 
 void Fluid::addDensity(const int x, const int y, const float amount) {
     constexpr int radius = 1;  // adjust this for smoother / wider strokes
@@ -32,46 +26,46 @@ void Fluid::addDensity(const int x, const int y, const float amount) {
             if (xi >= 0 && xi < gridSize && yj >= 0 && yj < gridSize) {
                 const float dist2 = i*i + j*j;
                 const float weight = std::exp(-dist2 / (2.0f * radius * radius));
-                density[IX(xi, yj)] += amount * weight;
+                density(xi, yj) += amount * weight;
             }
         }
     }
 }
 
 void Fluid::addVelocity(const int x, const int y, const float amountX, const float amountY) {
-    velocityX[IX(x, y)] += amountX;
-    velocityY[IX(x, y)] += amountY;
+    velocityX(x, y) += amountX;
+    velocityY(x, y) += amountY;
 }
 
-void Fluid::applyBoundaryConditions(const int b, std::vector<float>& x) const {
+void Fluid::applyBoundaryConditions(const int b, Grid& x) const {
     for (int i = 1; i < gridSize - 1; i++) {
-        x[IX(i, 0)] = b == 2 ? -x[IX(i, 1)] : x[IX(i, 1)];
-        x[IX(i, gridSize - 1)] = b == 2 ? -x[IX(i, gridSize - 2)] : x[IX(i, gridSize - 2)];
+        x(i, 0) = b == 2 ? -x(i, 1) : x(i, 1);
+        x(i, gridSize - 1) = b == 2 ? -x(i, gridSize - 2) : x(i, gridSize - 2);
     }
     for (int j = 1; j < gridSize - 1; j++) {
-        x[IX(0, j)] = b == 1 ? -x[IX(1, j)] : x[IX(1, j)];
-        x[IX(gridSize - 1, j)] = b == 1 ? -x[IX(gridSize - 2, j)] : x[IX(gridSize - 2, j)];
+        x(0, j) = b == 1 ? -x(1, j) : x(1, j);
+        x(gridSize - 1, j) = b == 1 ? -x(gridSize - 2, j) : x(gridSize - 2, j);
     }
 
-    x[IX(0, 0)] = 0.5f * (x[IX(1, 0)] + x[IX(0, 1)]);
-    x[IX(0, gridSize-1)] = 0.5f * (x[IX(1, gridSize-1)] + x[IX(0, gridSize-2)]);
-    x[IX(gridSize-1, 0)] = 0.5f * (x[IX(gridSize-2, 0)] + x[IX(gridSize-1, 1)]);
-    x[IX(gridSize-1, gridSize-1)] = 0.5f * (x[IX(gridSize-2, gridSize-1)] + x[IX(gridSize-1, gridSize-2)]);
+    x(0, 0) = 0.5f * (x(1, 0) + x(0, 1));
+    x(0, gridSize-1) = 0.5f * (x(1, gridSize-1) + x(0, gridSize-2));
+    x(gridSize-1, 0) = 0.5f * (x(gridSize-2, 0) + x(gridSize-1, 1));
+    x(gridSize-1, gridSize-1) = 0.5f * (x(gridSize-2, gridSize-1) + x(gridSize-1, gridSize-2));
 }
 
-void Fluid::linearSolve(const int b, std::vector<float>& x, const std::vector<float>& x0, const float a, const float c)
+void Fluid::linearSolve(const int b, Grid& x, const Grid& x0, const float a, const float c)
 const {
     const float cRecip = 1.0f / c;
-    std::vector<float> xNew(x.size(), 0.0f);
+    Grid xNew(x.size, 0.0f);
 
     for (int k = 0; k < solverIterations; k++) {
 #pragma omp parallel for collapse(2)
         for (int j = 1; j < gridSize - 1; j++) {
             for (int i = 1; i < gridSize - 1; i++) {
-                xNew[IX(i, j)] =
-                    (x0[IX(i, j)]
-                    + a*(x[IX(i+1, j)] + x[IX(i-1, j)]
-                         + x[IX(i, j+1)] + x[IX(i, j-1)])) * cRecip;
+                xNew(i, j) =
+                    (x0(i, j)
+                    + a*(x(i+1, j) + x(i-1, j)
+                         + x(i, j+1) + x(i, j-1))) * cRecip;
             }
         }
 
@@ -83,17 +77,17 @@ const {
     }
 }
 
-void Fluid::projectVelocity(std::vector<float>& velocityX, std::vector<float>& velocityY,
-                    std::vector<float>& p, std::vector<float>& div) const {
+void Fluid::projectVelocity(Grid& velocityX, Grid& velocityY,
+                    Grid& p, Grid& div) const {
     // First loop: compute divergence & reset p
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
-            div[IX(i, j)] = -0.5f*(
-                velocityX[IX(i+1, j)] - velocityX[IX(i-1, j)]
-                + velocityY[IX(i, j+1)] - velocityY[IX(i, j-1)]
+            div(i, j) = -0.5f*(
+                velocityX(i+1, j) - velocityX(i-1, j)
+                + velocityY(i, j+1) - velocityY(i, j-1)
             ) / gridSize;
-            p[IX(i, j)] = 0;
+            p(i, j) = 0;
         }
     }
 
@@ -105,8 +99,8 @@ void Fluid::projectVelocity(std::vector<float>& velocityX, std::vector<float>& v
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
-            velocityX[IX(i, j)] -= 0.5f * (p[IX(i+1, j)] - p[IX(i-1, j)]) * gridSize;
-            velocityY[IX(i, j)] -= 0.5f * (p[IX(i, j+1)] - p[IX(i, j-1)]) * gridSize;
+            velocityX(i, j) -= 0.5f * (p(i+1, j) - p(i-1, j)) * gridSize;
+            velocityY(i, j) -= 0.5f * (p(i, j+1) - p(i, j-1)) * gridSize;
         }
     }
 
@@ -145,8 +139,8 @@ void Fluid::advanceSimulation() {
     advectQuantity(0, density, prevDensity, velocityX, velocityY, timeStep);
 }
 
-void Fluid::advectQuantity(int b, std::vector<float>& d, const std::vector<float>& d0,
-                   const std::vector<float>& velocityX, const std::vector<float>& velocityY, float timeStep) const {
+void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
+                   const Grid& velocityX, const Grid& velocityY, float timeStep) const {
     float nfloat = gridSize;
     float dtx = timeStep * (gridSize - 2);
     float dty = timeStep * (gridSize - 2);
@@ -155,8 +149,8 @@ void Fluid::advectQuantity(int b, std::vector<float>& d, const std::vector<float
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
-            float x = i - dtx * velocityX[IX(i,j)];
-            float y = j - dty * velocityY[IX(i,j)];
+            float x = i - dtx * velocityX(i,j);
+            float y = j - dty * velocityY(i,j);
 
             if (x < 0.5f) x = 0.5f;
             if (x > nfloat - 1.5f) x = nfloat - 1.5f;
@@ -173,36 +167,34 @@ void Fluid::advectQuantity(int b, std::vector<float>& d, const std::vector<float
             const float t1 = y - j0;
             const float t0 = 1.0f - t1;
 
-            d[IX(i,j)] =
-                s0*(t0*d0[IX(i0,j0)] + t1*d0[IX(i0,j1)]) +
-                s1*(t0*d0[IX(i1,j0)] + t1*d0[IX(i1,j1)]);
+            d(i,j) =
+                s0*(t0*d0(i0,j0) + t1*d0(i0,j1)) +
+                s1*(t0*d0(i1,j0) + t1*d0(i1,j1));
         }
     }
 
     applyBoundaryConditions(b, d);
 }
 
-void Fluid::diffuseQuantity(int b, std::vector<float>& x, const std::vector<float>& x0,
-             float diffusionRate, float timeStep) const {
-    float a = timeStep * diffusionRate * (gridSize - 2) * (gridSize - 2);
+void Fluid::diffuseQuantity(int b, Grid& x, const Grid& x0,
+             const float diffusionRate, const float timeStep) const {
+    const float a = timeStep * diffusionRate * (gridSize - 2) * (gridSize - 2);
     linearSolve(b, x, x0, a, 1 + 6*a);
 }
 
 void Fluid::renderDensity(sf::RenderWindow& window) const {
-    static sf::Texture densityTex;
-    static bool initialized = false;
-
-    if (!initialized) {
+    if (!densityTexInit) {
         densityTex.create(gridSize, gridSize);
-        densityTex.setSmooth(true); // smooth scaling
-        initialized = true;
+        densityTex.setSmooth(true);
+        densityTexInit = true;
     }
+
 
     // Update texture pixels from density
     std::vector<sf::Uint8> pixels(gridSize * gridSize * 4); // RGBA
     for (int j = 0; j < gridSize; j++) {
         for (int i = 0; i < gridSize; i++) {
-            const float d = density[IX(i, j)] / 255.0f;
+            const float d = density(i, j) / 255.0f;
             const sf::Uint8 c = static_cast<sf::Uint8>(std::clamp(d * 255.0f, 0.f, 255.f));
             const int idx = 4 * (j * gridSize + i);
             pixels[idx + 0] = c; // R
@@ -221,9 +213,13 @@ void Fluid::renderDensity(sf::RenderWindow& window) const {
 }
 
 void Fluid::decayDensity() {
-#pragma omp parallel for
-    for (int i = 0; i < this->density.size(); i++) {
-        const float d = density[i];
-        density[i] = std::clamp(d - 0.05f, 0.f, 255.f);
+    constexpr float densityDecayRate = 0.05f;
+
+#pragma omp parallel for collapse(2)
+    for (int y = 0; y < gridSize; y++) {
+        for (int x = 0; x < gridSize; x++) {
+            float& d = density(x, y);
+            d = std::clamp(d - densityDecayRate, 0.0f, 255.0f);
+        }
     }
 }
