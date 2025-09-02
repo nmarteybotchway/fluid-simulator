@@ -1,4 +1,4 @@
-#include "Fluid.h"
+#include "../include/Fluid.h"
 #include <cmath>
 
 Fluid::Fluid(const int gridSize, const int solverIterations, const float timeStep, const float diffusionRate,
@@ -199,7 +199,6 @@ void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
 
     applyBoundaryConditions(b, d);
 }
-
 
 /**
  * Diffuse a quantity by solving the linear system

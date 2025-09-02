@@ -1,5 +1,5 @@
 #include <SFML/Graphics.hpp>
-#include "Fluid.h"
+#include "../include/Fluid.h"
 
 /**
  * @brief Apply mouse interaction to the fluid simulation.

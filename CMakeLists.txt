@@ -8,10 +8,10 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(SFML 2.5 REQUIRED graphics window system)
 
 # Add your source files
-add_executable(fluid_simulation main.cpp
-        Fluid.cpp
-        Fluid.h
-        Grid.h)
+add_executable(fluid_simulation src/main.cpp
+        src/Fluid.cpp
+        include/Fluid.h
+        include/Grid.h)
 
 # Link SFML libraries to your project
 target_link_libraries(fluid_simulation sfml-graphics sfml-window sfml-system)
