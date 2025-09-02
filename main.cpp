@@ -54,6 +54,7 @@ int main() {
                 window.close();
         }
 
+
         // Compute mouse movement delta
         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
         sf::Vector2i delta = mousePos - prevMousePos;

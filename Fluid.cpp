@@ -200,6 +200,7 @@ void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
     applyBoundaryConditions(b, d);
 }
 
+
 /**
  * Diffuse a quantity by solving the linear system
  */

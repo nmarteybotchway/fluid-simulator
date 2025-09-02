@@ -32,6 +32,7 @@ struct Grid {
         return data[x + y * size];
     }
 
+
     /**
      * @brief Const access to a cell for reading.
      * @param x X-coordinate

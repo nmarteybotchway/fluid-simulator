@@ -132,6 +132,7 @@ public:
      * @param diff Diffusion coefficient
      * @param dt Timestep
      */
+
     void diffuseQuantity(int b, Grid& x, const Grid& x0, float diff, float dt) const;
 
     /**
