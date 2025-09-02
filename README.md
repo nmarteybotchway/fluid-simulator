@@ -1,6 +1,6 @@
 # Fluid Simulation
 
-A real-time 2D fluid simulation in C++ using **SFML**, implementing a stable fluid solver based on Jos Stam's method.  
+A real-time 2D fluid simulation in C++ using **SFML**, implementing a stable fluid solver.  
 Add density and velocity interactively with your mouse to create swirling fluid effects.
 
 ---
@@ -48,3 +48,15 @@ cmake --build .
 
 - Left mouse click + drag: add density and velocity.
 - Close window to exit
+
+## References
+
+1. **Mike Ash, "Fluid Simulation for Dummies"**  
+   [https://mikeash.com/pyblog/fluid-simulation-for-dummies.html)
+
+2. **OpenMP Documentation – Parallel Programming in C++**  
+   [https://www.openmp.org/resources/](https://www.openmp.org/resources/)
+
+3. **SFML (Simple and Fast Multimedia Library)**  
+   [https://www.sfml-dev.org/](https://www.sfml-dev.org/)  
+   

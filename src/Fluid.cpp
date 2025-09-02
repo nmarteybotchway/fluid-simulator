@@ -16,7 +16,8 @@ Fluid::Fluid(const int gridSize, const int solverIterations, const float timeSte
     velocityXPrev{gridSize},
     velocityYPrev{gridSize},
     linearSolveBuffer{gridSize} // initialize buffer for linearSolve
-{}
+{
+}
 
 /**
  * Add density to a cell and its neighbors with Gaussian weighting for smooth strokes.
@@ -74,7 +75,7 @@ void Fluid::linearSolve(const int b, Grid& x, const Grid& x0, const float a, con
 
     if (linearSolveBuffer.size != x.size)
         linearSolveBuffer = Grid(x.size, 0.0f);
-    Grid& xNew = linearSolveBuffer;
+    Grid &xNew = linearSolveBuffer;
 
     for (int k = 0; k < solverIterations; k++) {
 #pragma omp parallel for collapse(2)
@@ -164,8 +165,8 @@ void Fluid::advectQuantity(int b, Grid& d, const Grid& d0,
 #pragma omp parallel for collapse(2)
     for (int j = 1; j < gridSize - 1; j++) {
         for (int i = 1; i < gridSize - 1; i++) {
-            float x = i - backtraceScale * velocityX(i,j);
-            float y = j - backtraceScale * velocityY(i,j);
+            float x = i - backtraceScale * velocityX(i, j);
+            float y = j - backtraceScale * velocityY(i, j);
 
             if (x < 0.5f) x = 0.5f;
             if (x > gridSize - 1.5f) x = gridSize - 1.5f;

@@ -29,6 +29,7 @@ class Fluid {
     mutable bool densityTexInit = false;  ///< Flag if texture initialized
     mutable std::vector<sf::Uint8> pixels;///< Pixel buffer for texture updates
     mutable Grid linearSolveBuffer;
+
 public:
     /**
      * @brief Construct a new Fluid simulation instance.
