@@ -52,7 +52,7 @@ cmake --build .
 ## References
 
 1. **Mike Ash, "Fluid Simulation for Dummies"**  
-   [https://mikeash.com/pyblog/fluid-simulation-for-dummies.html]
+   https://mikeash.com/pyblog/fluid-simulation-for-dummies.html
 
 2. **OpenMP Documentation – Parallel Programming in C++**  
    [https://www.openmp.org/resources/](https://www.openmp.org/resources/)
